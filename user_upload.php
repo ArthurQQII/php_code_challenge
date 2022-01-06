@@ -36,6 +36,7 @@ function check_db_table_exist($conn, $tableName)
     }
     return FALSE;
 }
+
 /**
  * create table in the database
  */
@@ -128,7 +129,6 @@ function db_insert($connnect, $data)
             );
         }
     }
-    
 }
 
 /**
@@ -160,6 +160,9 @@ function get_password_input()
     return $passInput;
 }
 
+/**
+ * usage function
+ */
 function _usage()
 {
     echo
@@ -176,6 +179,7 @@ function _usage()
     echo "  help             which will output the above list of directives with details.\n";
     die();
 }
+
 /**
  * main function
  */
@@ -197,8 +201,6 @@ function main()
     }
     $options['password'] = array_key_exists("p", $options) ? get_password_input() : "";
     $conn = connect_db($options['h'], $options['u'], $options['password']);
-    
-    
     if (array_key_exists("create_table", $options)) {
         create_table($conn);
         $conn->close();
