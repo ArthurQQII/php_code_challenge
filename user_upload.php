@@ -37,6 +37,10 @@ function create_table($conn)
     }
 }
 
+/**
+ * check the format of the name, surname and email,
+ * if the email is not valid, print the error message and no insert happen
+ */
 function format_validate_user($users)
 {
     $output = [];
@@ -49,17 +53,17 @@ function format_validate_user($users)
                 fprintf(STDOUT, "email is not valid   %s\n", $user['email']);
             } else {
                 $output[$count]['name'] = ucfirst($user['name']);
-                $output[$count]['surname'] = ucfirst($user['name']);
+                $output[$count]['surname'] = ucfirst($user['surname']);
                 $output[$count++]['email'] = strtolower($user['email']);
             }
         }
     }
-
-    foreach ($output as  $q) {
-        echo $q['name'] . "  " . $q['surname'] . "  " . $q['email'] . "\n";
-    }
+    return $output;
 }
 
+/**
+ * read the file and output the formatted user information
+ */
 function read_csv_file($fileName)
 {
     $file = fopen($fileName, "r");
@@ -69,27 +73,51 @@ function read_csv_file($fileName)
     while (($userData = fgetcsv($file)) !== false) {
         if (count($userData) == 3) {
             $users[$userCount++] = [
-                "name" => $userData[0],
-                "surname" => $userData[1],
-                "email" => $userData[2],
+                "name" => trim($userData[0]),
+                "surname" => trim($userData[1]),
+                "email" => trim($userData[2])
             ];
-            //echo $users[$userCount - 1]['name'] . "  " . $users[$userCount - 1]['surname'] . "  " . $users[$userCount - 1]['email'] . "\n";
         }
     }
-    format_validate_user($users);
+    return format_validate_user($users);
 }
+
+/**
+ * insert the data to database
+ */
+function db_insert($connnect, $data)
+{
+    if (count($data) == 0) {
+        return;
+    }
+    foreach ($data as $user) {
+        $sql = sprintf(
+            'INSERT INTO users (name, surname, email) VALUES ("%s", "%s", "%s");',
+            $user['name'],
+            $user['surname'],
+            $user['email']
+        );
+        try {
+            $connnect->query($sql);
+        } catch (Throwable $error) {
+            echo "Error: " . $sql . "\n fail to insert the data\n";
+        }
+    }
+    
+}
+
 /**
  * main function
  */
 function main()
 {
-    // $servername = "localhost";
-    // $username = "root";
-    // $password = "password";
-    // $conn = connect_db($servername, $username, $password);
-    // create_table($conn);
-    // $conn->close();
-    read_csv_file('users.csv');
+    $servername = "localhost";
+    $username = "root";
+    $password = "password";
+    $conn = connect_db($servername, $username, $password);
+    create_table($conn);
+    db_insert($conn, read_csv_file('users.csv'));
+    $conn->close();
 }
 
 /**
