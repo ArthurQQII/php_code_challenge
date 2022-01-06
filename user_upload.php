@@ -107,17 +107,49 @@ function db_insert($connnect, $data)
 }
 
 /**
+ * get password input from stdin, show * when typing
+ */
+function get_password_input()
+{
+    readline_callback_handler_install('', function () {
+    });
+    echo ("Password: ");
+    $passInput = '';
+    while (true) {
+        $strChar = stream_get_contents(STDIN, 1);
+        if ($strChar === chr(10)) {
+            break;
+        }
+        $passInput .= $strChar;
+        echo ("*");
+    }
+    echo ("\n");
+    return $passInput;
+}
+
+/**
  * main function
  */
 function main()
 {
-    $servername = "localhost";
-    $username = "root";
-    $password = "password";
-    $conn = connect_db($servername, $username, $password);
+    // $servername = "localhost";
+    // $username = "root";
+    // $password = "password";
+    $shortopts  = "u:ph:";
+    $longopts = array(
+        "file:",
+        "create_table",
+        "dry_run",
+        "help"
+    );
+    $options = getopt($shortopts, $longopts);
+    $options['password'] = array_key_exists("p", $options) ? get_password_input() : "";
+    $conn = connect_db($options['h'], $options['u'], $options['password']);
     create_table($conn);
-    db_insert($conn, read_csv_file('users.csv'));
+    $data = read_csv_file($options['file']);
+    db_insert($conn, $data);
     $conn->close();
+    //echo var_dump($options);
 }
 
 /**
