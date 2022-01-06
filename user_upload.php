@@ -11,7 +11,6 @@ function connect_db($servername, $username, $password)
     } catch (Throwable $error) {
         die(sprintf("Access denied for user '%s'@'%s'", $username, $servername));
     }
-    
     $sql = "CREATE DATABASE IF NOT EXISTS myDb";
     if ($conn->query($sql) === TRUE) {
         printf("Database created successfully\n");
@@ -24,17 +23,33 @@ function connect_db($servername, $username, $password)
 }
 
 /**
+ * check the table exists or not
+ */
+function check_db_table_exist($conn, $tableName)
+{
+    try {
+        if ($conn->query("select 1 from " . $tableName) == TRUE) {
+            return TRUE;
+        };
+    } catch (Throwable $error) {
+        return FALSE;
+    }
+    return FALSE;
+}
+/**
  * create table in the database
  */
 function create_table($conn)
 {
+    $sql = "DROP TABLE IF EXISTS users;"; //rebuild the table
+    $conn->query($sql);
     $sql = "CREATE TABLE IF NOT EXISTS users(
                 id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 name VARCHAR(30) NOT NULL,
                 surname VARCHAR(30) NOT NULL,
                 email VARCHAR(50) UNIQUE)";
     if ($conn->query($sql) === TRUE) {
-        printf("Table users created successfully\n");
+        printf("Table users created/rebuild successfully\n");
     } else {
         die("Error creating table: %s" . $conn->error);
     }
@@ -105,7 +120,12 @@ function db_insert($connnect, $data)
         try {
             $connnect->query($sql);
         } catch (Throwable $error) {
-            echo "Error:  Fail to insert the data\n  " . sprintf("name: %s  email: %s\n", $user['name'] . " " . $user['surname'], $user['email']);
+            echo "Error:  Fail to insert the data\n  ";
+            echo sprintf(
+                "name: %s  email: %s\n",
+                $user['name'] . " " . $user['surname'],
+                $user['email']
+            );
         }
     }
     
@@ -178,10 +198,15 @@ function main()
     $options['password'] = array_key_exists("p", $options) ? get_password_input() : "";
     $conn = connect_db($options['h'], $options['u'], $options['password']);
     
-    create_table($conn);
+    
     if (array_key_exists("create_table", $options)) {
+        create_table($conn);
         $conn->close();
         return;
+    } else {
+        if (!check_db_table_exist($conn, "users")) {
+            die("Table users not exists");
+        }
     }
     if (!array_key_exists("file", $options)) {
         _usage();
