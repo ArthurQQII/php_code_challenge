@@ -6,10 +6,9 @@
 function connect_db($servername, $username, $password)
 {
     $conn = null;
-    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
     try {
         $conn = new mysqli($servername, $username, $password);
-    } catch (mysqli_sql_exception  $error) {
+    } catch (Throwable $error) {
         die(sprintf("Access denied for user '%s'@'%s'", $username, $servername));
     }
     
@@ -143,9 +142,18 @@ function get_password_input()
 
 function _usage()
 {
-    echo "usage: php user_upload.php [--file <filename>] [--create_table]
-        [--dry_run] [-u <username>] [-p] [-h <hostname>] [--hep]";
-
+    echo
+    "usage: php user_upload.php [--file <filename>] [--create_table]
+        [--dry_run] [-u <username>] [-p] [-h <hostname>] [--hep]\n\n";
+    echo "  file             name of the CSV to be parsed\n";
+    echo "  create_table     the MySQL users table will be built\n";
+    echo "  dry_run          this will be used with the --file directive in case we\n";
+    echo "                   want to run the script but not insert into the DB. All\n";
+    echo "                   other functions will be executed, but the database won't be altered\n";
+    echo "  u                MySQL username\n";
+    echo "  p                MySQL password\n";
+    echo "  h                MySQL host\n";
+    echo "  help             which will output the above list of directives with details.\n";
     die();
 }
 /**
