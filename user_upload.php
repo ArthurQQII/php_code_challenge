@@ -5,15 +5,19 @@
  */
 function connect_db($servername, $username, $password)
 {
-    $conn = new mysqli($servername, $username, $password);
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
+    $conn = null;
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+    try {
+        $conn = new mysqli($servername, $username, $password);
+    } catch (mysqli_sql_exception  $error) {
+        die(sprintf("Access denied for user '%s'@'%s'", $username, $servername));
     }
+    
     $sql = "CREATE DATABASE IF NOT EXISTS myDb";
     if ($conn->query($sql) === TRUE) {
         printf("Database created successfully\n");
         $conn->select_db('myDb');
-        printf("change database to myDb\n");
+        printf("Change database to myDb\n");
     } else {
         die("DATABASE creation failed: " . $conn->error);
     }
@@ -50,7 +54,9 @@ function format_validate_user($users)
             die("name and surname should not be null\n");
         } else {
             if (!filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
-                fprintf(STDOUT, "email is not valid   %s\n", $user['email']);
+                fprintf(STDOUT, "------------------------------------------\n");
+                fprintf(STDOUT, "#Email is not valid   %s\n", $user['email']);
+                fprintf(STDOUT, "------------------------------------------\n");
             } else {
                 $output[$count]['name'] = ucfirst($user['name']);
                 $output[$count]['surname'] = ucfirst($user['surname']);
@@ -100,7 +106,7 @@ function db_insert($connnect, $data)
         try {
             $connnect->query($sql);
         } catch (Throwable $error) {
-            echo "Error: " . $sql . "\n fail to insert the data\n";
+            echo "Error:  Fail to insert the data\n  " . sprintf("name: %s  email: %s\n", $user['name'] . " " . $user['surname'], $user['email']);
         }
     }
     
@@ -120,21 +126,33 @@ function get_password_input()
         if ($strChar === chr(10)) {
             break;
         }
-        $passInput .= $strChar;
-        echo ("*");
+        if ($strChar === chr(127)) {
+            if (strlen($passInput) != 0) {
+                echo chr(27) . "[1D";
+                echo chr(27) . "[1P";
+                $passInput = substr_replace($passInput, "", -1);
+            }
+        } else {
+            $passInput .= $strChar;
+            echo ("*");
+        }
     }
     echo ("\n");
     return $passInput;
 }
 
+function _usage()
+{
+    echo "usage: php user_upload.php [--file <filename>] [--create_table]
+        [--dry_run] [-u <username>] [-p] [-h <hostname>] [--hep]";
+
+    die();
+}
 /**
  * main function
  */
 function main()
 {
-    // $servername = "localhost";
-    // $username = "root";
-    // $password = "password";
     $shortopts  = "u:ph:";
     $longopts = array(
         "file:",
@@ -143,13 +161,30 @@ function main()
         "help"
     );
     $options = getopt($shortopts, $longopts);
+    if (
+        array_key_exists("help", $options) ||
+        !array_key_exists("u", $options) || !array_key_exists("h", $options)
+    ) {
+        _usage();
+    }
     $options['password'] = array_key_exists("p", $options) ? get_password_input() : "";
     $conn = connect_db($options['h'], $options['u'], $options['password']);
+    
     create_table($conn);
+    if (array_key_exists("create_table", $options)) {
+        $conn->close();
+        return;
+    }
+    if (!array_key_exists("file", $options)) {
+        _usage();
+    }
     $data = read_csv_file($options['file']);
+    if (array_key_exists("dry_run", $options)) {
+        $conn->close();
+        return;
+    }
     db_insert($conn, $data);
     $conn->close();
-    //echo var_dump($options);
 }
 
 /**
