@@ -1,23 +1,37 @@
 <?php
 
 /**
+ * error hanld and exit
+ */
+function error_exit($errMsg, $exitCode)
+{
+    fprintf(STDERR, "ERROR: " . $errMsg);
+    exit($exitCode);
+}
+
+/**
  * connect to database, if the database is not created, create that.
  */
 function connect_db($servername, $username, $password)
 {
-    $conn = null;
+    $conn = false;
     try {
-        $conn = new mysqli($servername, $username, $password);
-    } catch (Throwable $error) {
-        die(sprintf("Access denied for user '%s'@'%s'", $username, $servername));
+        $conn = mysqli_connect($servername, $username, $password);
+        if ($conn === false) {
+            error_exit("Database server connect fail\n", 1);
+        }
+        echo "Database server connect successfully\n";
+    } catch (Exception $e) {
+        error_exit("Database server connect fail\n", 1);
     }
+
     $sql = "CREATE DATABASE IF NOT EXISTS myDb";
     if ($conn->query($sql) === TRUE) {
-        printf("Database created successfully\n");
+        printf("Database connect successfully\n");
         $conn->select_db('myDb');
         printf("Change database to myDb\n");
     } else {
-        die("DATABASE creation failed: " . $conn->error);
+        error_exit("DATABASE creation failed: \n", 2);
     }
     return $conn;
 }
@@ -52,7 +66,7 @@ function create_table($conn)
     if ($conn->query($sql) === TRUE) {
         printf("Table users created/rebuild successfully\n");
     } else {
-        die("Error creating table: %s" . $conn->error);
+        error_exit("Error creating table", 3);
     }
 }
 
@@ -63,7 +77,6 @@ function create_table($conn)
 function format_validate_user($users)
 {
     $output = [];
-    $count = 0;
     foreach ($users as $user) {
         if (strlen($user['name']) == 0 || strlen($user['surname']) == 0) {
             die("name and surname should not be null\n");
@@ -73,9 +86,12 @@ function format_validate_user($users)
                 fprintf(STDOUT, "#Email is not valid   %s\n", $user['email']);
                 fprintf(STDOUT, "------------------------------------------\n");
             } else {
-                $output[$count]['name'] = ucfirst($user['name']);
-                $output[$count]['surname'] = ucfirst($user['surname']);
-                $output[$count++]['email'] = strtolower($user['email']);
+                $tmpUser = array(
+                    "name" => ucfirst($user['name']),
+                    "surname" => ucfirst($user['surname']),
+                    "email" => strtolower($user['email']),
+                );
+                array_push($output, $tmpUser);
             }
         }
     }
@@ -90,7 +106,10 @@ function read_csv_file($fileName)
     $file = fopen($fileName, "r");
     $users = [];
     $userCount = 0;
-    $userData = fgetcsv($file);
+    $dataField = fgetcsv($file);
+    if (count($dataField) != 3) {
+        error_exit("Csv file should only have 3 fields: name, surname, email\n", 4);
+    }
     while (($userData = fgetcsv($file)) !== false) {
         if (count($userData) == 3) {
             $users[$userCount++] = [
@@ -119,9 +138,17 @@ function db_insert($connnect, $data)
             $user['email']
         );
         try {
-            $connnect->query($sql);
-        } catch (Throwable $error) {
-            echo "Error:  Fail to insert the data\n  ";
+            $result = $connnect->query($sql);
+            if ($result === FALSE) {
+                echo "Error:  Fail to insert the duplicated data\n  ";
+                echo sprintf(
+                    "name: %s  email: %s\n",
+                    $user['name'] . " " . $user['surname'],
+                    $user['email']
+                );
+            }
+        } catch (Exception | Throwable $t) {
+            echo "Error:  Fail to insert the duplicated data\n  ";
             echo sprintf(
                 "name: %s  email: %s\n",
                 $user['name'] . " " . $user['surname'],
@@ -181,6 +208,19 @@ function _usage()
 }
 
 /**
+ * check the file type and exist or not
+ */
+function file_check($file)
+{
+    if (!file_exists($file)) {
+        return false;
+    }
+    if (count(explode(".", $file)) != 2 || explode(".", $file)[1] != "csv") {
+        return false;
+    }
+    return true;
+}
+/**
  * main function
  */
 function main()
@@ -204,24 +244,31 @@ function main()
     if (array_key_exists("create_table", $options)) {
         create_table($conn);
         $conn->close();
-        return;
+        exit(0);
     } else {
         if (!check_db_table_exist($conn, "users")) {
-            die("Table users not exists");
+            error_exit("Table users does not exist\n", 5);
         }
     }
     if (!array_key_exists("file", $options)) {
         _usage();
+        error_exit("No csv file selected", 6);
+    }
+    if (!file_check($options['file'])) {
+        error_exit("Selected file does not exist or is not csv file\n", 7);
     }
     $data = read_csv_file($options['file']);
     if (array_key_exists("dry_run", $options)) {
         $conn->close();
-        return;
+        exit(0);
     }
     db_insert($conn, $data);
     $conn->close();
+    exit(0);
 }
 
+set_error_handler(function () {
+});
 /**
  * run main function
  */
